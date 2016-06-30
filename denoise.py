@@ -17,6 +17,7 @@ def denoise(evals,param_arg,betaswtr_arg,states):
 
 	evaluations = evals
 
+
 	nCols = 0
 	NEVALS = len(evals)
 	g = maxflow.Graph[float](200, 200)
@@ -25,62 +26,44 @@ def denoise(evals,param_arg,betaswtr_arg,states):
 
 	for i in range(ROW):
 		for j in range(NEVALS):
-			imageBuilder[i][j] = 9
+			imageBuilder[i][j] = -1
 
-	nodeNumber = 0
-	actionLast = [0,0]
-
-	for i in range(NEVALS):
-
-		if evaluations[i][0] > nodeNumber:
-
-			if actionLast[0] > actionLast[1]:
-				imageBuilder[1][nCols+actionLast[1]] = 0
-				nCols = nCols + actionLast[0]
-			elif actionLast[1] > actionLast[0]:
-				imageBuilder[0][nCols+actionLast[0]] = 0
-				nCols = nCols + actionLast[1]
-			else:
-				nCols = nCols + actionLast[1]
-
-			actionLast[0] = 0
-			actionLast[1] = 0
-			nodeNumber += 1
-
-			if nodeNumber > states:
-				break
-
-		if evaluations[i][1] == 0:
-
-			if actionLast[0] == actionLast[1] or actionLast[0] < actionLast[1]:
-				imageBuilder[0][nCols+actionLast[0]] = 1 - evaluations[i][2]
-				actionLast[0] = actionLast[0] + 1
-			else:
-				imageBuilder[1][nCols+actionLast[1]] = 1 - evaluations[i][2]
-				actionLast[1] = actionLast[1] + 1
-
+	for i, row in enumerate(evals):
+		state = row[0]
+		action = row[1]
+		evaluation = row[2]
+		if i == 0:
+			currentState = state
+			currentCol = 0
+			imageBuilder[1-action][currentCol] = evaluation
+			actionLast = action
 		else:
-
-			if actionLast[1] == actionLast[0] or actionLast[1] < actionLast[0]:
-				imageBuilder[1][nCols+actionLast[1]] = evaluations[i][2]
-				actionLast[1] = actionLast[1] + 1
+			if state == currentState:
+				if action == actionLast:
+					action = 1 - action
+					evaluation = 1 - evaluation
+				if imageBuilder[1-action][currentCol] == -1:
+					imageBuilder[1-action][currentCol] = evaluation
+				else:
+					currentCol = currentCol + 1
+					imageBuilder[1-action][currentCol] = evaluation
+					imageBuilder[action][currentCol] = -1
 			else:
-				imageBuilder[0][nCols+actionLast[0]] = evaluations[i][2]
-				actionLast[0] = actionLast[0] + 1
+				currentState = state
+				currentCol = currentCol + 1
+				imageBuilder[1 - action][currentCol] = evaluation
+				imageBuilder[action][currentCol] = -1
+			actionLast = action
 
-	if actionLast[0] > actionLast[1]:
-		imageBuilder[1][nCols+actionLast[1]] = 3
-		nCols = nCols + actionLast[0]
-	elif actionLast[0] > actionLast[1]:
-		imageBuilder[0][nCols+actionLast[0]] = 3
-		nCols = nCols + actionLast[1]
-	else:
-		nCols = nCols + actionLast[1]
-
-	deNoiseImage = list_2D(nCols, ROW)
-	finalDeNoiseImage = list_2D(nCols, ROW)
+	for i in range(len(evals)):
+		if imageBuilder[0][i] != -1:
+			imageBuilder[0][i] = 1 - imageBuilder[0][i]
+######
+	deNoiseImage = list_2D(currentCol, ROW)
+	finalDeNoiseImage = list_2D(currentCol, ROW)
 	count = 0
-	nNew = nCols	
+	nNew = currentCol
+	imageBuilder = imageBuilder[:][0:nNew+1]	
 
 	for i in range(ROW):
 		for j in range(nNew):
@@ -98,27 +81,20 @@ def denoise(evals,param_arg,betaswtr_arg,states):
 	g.add_edge( nNew-1,2*nNew-1, betaswtr, betaswtr );
 
 	flow = g.maxflow();
-	#print 'Maxflow Value: {}'.format(flow)
+
 	for i in range(ROW):
 		for j in range(nNew):
-			#print g.get_segment(j+i*nNew)
+
 			if (g.get_segment(j+i*nNew)):
 				deNoiseImage[i][j] = 1
 			else:
 				deNoiseImage[i][j] = 0
 
-	#print 'Denoised Image:'
-	#print deNoiseImage
-
 	for j in range(nNew):
 		finalDeNoiseImage[0][j] = 1 - deNoiseImage[0][j]
 		finalDeNoiseImage[1][j] = deNoiseImage[1][j]
 
-	#print 'Final Denoised Image:'
-	#print finalDeNoiseImage
-
 	return (flow, deNoiseImage, finalDeNoiseImage, imageBuilder)
-
 
 if __name__ == "__main__":
 	denoise(getEvals(),.3,.5)
