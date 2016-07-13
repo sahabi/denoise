@@ -17,25 +17,28 @@ def denoise(evals,param_arg,betaswtr_arg,states):
 
 	evaluations = evals
 
-
 	nCols = 0
 	NEVALS = len(evals)
 	g = maxflow.Graph[float](200, 200)
 
 	imageBuilder = list_2D(NEVALS, ROW)
+	imageBuilder_ts = list_2D(NEVALS, ROW)
 
 	for i in range(ROW):
 		for j in range(NEVALS):
 			imageBuilder[i][j] = -1
+			imageBuilder_ts[i][j] = -1
 
 	for i, row in enumerate(evals):
 		state = row[0]
 		action = row[1]
 		evaluation = row[2]
+		ts = row[3]
 		if i == 0:
 			currentState = state
 			currentCol = 0
 			imageBuilder[1-action][currentCol] = evaluation
+			imageBuilder_ts[1-action][currentCol] = [evaluation, ts]
 			actionLast = action
 		else:
 			if state == currentState:
@@ -44,25 +47,33 @@ def denoise(evals,param_arg,betaswtr_arg,states):
 					evaluation = 1 - evaluation
 				if imageBuilder[1-action][currentCol] == -1:
 					imageBuilder[1-action][currentCol] = evaluation
+					imageBuilder_ts[1-action][currentCol] = [evaluation, ts]
 				else:
 					currentCol = currentCol + 1
 					imageBuilder[1-action][currentCol] = evaluation
 					imageBuilder[action][currentCol] = -1
+					imageBuilder_ts[1-action][currentCol] = [evaluation, ts]
+					imageBuilder_ts[action][currentCol] = [-1, ts]
 			else:
 				currentState = state
 				currentCol = currentCol + 1
 				imageBuilder[1 - action][currentCol] = evaluation
 				imageBuilder[action][currentCol] = -1
+				imageBuilder_ts[1 - action][currentCol] = [evaluation, ts]
+				imageBuilder_ts[action][currentCol] = [-1, ts]
 			actionLast = action
 
 	for i in range(len(evals)):
 		if imageBuilder[0][i] != -1:
 			imageBuilder[0][i] = 1 - imageBuilder[0][i]
+			#imageBuilder_ts[0][i][0] = 1 - imageBuilder_ts[0][i][0]
 ######
+	currentCol += 1
 	deNoiseImage = list_2D(currentCol, ROW)
 	finalDeNoiseImage = list_2D(currentCol, ROW)
 	count = 0
 	nNew = currentCol
+	imageBuilder_ts = imageBuilder_ts[:][0:nNew+1]
 	imageBuilder = imageBuilder[:][0:nNew+1]	
 
 	for i in range(ROW):
@@ -86,15 +97,15 @@ def denoise(evals,param_arg,betaswtr_arg,states):
 		for j in range(nNew):
 
 			if (g.get_segment(j+i*nNew)):
-				deNoiseImage[i][j] = 1
-			else:
 				deNoiseImage[i][j] = 0
+			else:
+				deNoiseImage[i][j] = 1
 
 	for j in range(nNew):
 		finalDeNoiseImage[0][j] = 1 - deNoiseImage[0][j]
 		finalDeNoiseImage[1][j] = deNoiseImage[1][j]
 
-	return (flow, deNoiseImage, finalDeNoiseImage, imageBuilder)
+	return (flow, deNoiseImage, finalDeNoiseImage, imageBuilder, imageBuilder_ts)
 
 if __name__ == "__main__":
 	denoise(getEvals(),.3,.5)
